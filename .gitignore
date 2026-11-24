@@ -1,0 +1,11 @@
+# Runtime session tokens and state (never commit)
+bridge_env.json
+bridge_env.tmp
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.env
