@@ -81,6 +81,35 @@ def get_app_data_dir() -> Path:
     return Path(b.get("ANTIGRAVITY_APP_DATA_DIR", DEFAULT_APP_DATA_DIR))
 
 
+def resolve_project_id(project_id_or_name: str | None) -> str | None:
+    if not project_id_or_name:
+        return None
+    val = project_id_or_name.strip()
+    if not val:
+        return None
+    if UUID_RE.match(val) or val == "outside-of-project":
+        return val
+    # Try matching project name or folder name from ~/.gemini/config/projects/*.json
+    projects_dir = Path(DEFAULT_CONFIG_DIR) / "projects"
+    if projects_dir.exists():
+        val_lower = val.lower()
+        for p in projects_dir.glob("*.json"):
+            try:
+                data = json.loads(p.read_text(encoding="utf-8"))
+                pid = data.get("id", p.stem)
+                pname = str(data.get("name", "")).strip()
+                if pname.lower() == val_lower or pid.lower() == val_lower:
+                    return pid
+                resources = (data.get("projectResources") or {}).get("resources") or []
+                for r in resources:
+                    uri = urllib.parse.unquote(r.get("folderUri", ""))
+                    if uri.lower().endswith("/" + val_lower) or uri.lower().endswith("\\" + val_lower):
+                        return pid
+            except Exception:
+                pass
+    return val
+
+
 def run_agentapi(args: list[str], project_id: str | None = None, timeout: int = 30) -> dict[str, Any]:
     b = load_bridge_env()
     exe = b.get("ANTIGRAVITY_AGENTAPI_EXE", DEFAULT_AGENTAPI_EXE)
@@ -99,8 +128,9 @@ def run_agentapi(args: list[str], project_id: str | None = None, timeout: int = 
     env["ANTIGRAVITY_LS_ADDRESS"] = str(ls_addr)
     env["ANTIGRAVITY_CSRF_TOKEN"] = str(csrf)
     env["ANTIGRAVITY_AGENTAPI_EXE"] = str(exe)
-    if project_id:
-        env["ANTIGRAVITY_PROJECT_ID"] = str(project_id)
+    resolved_pid = resolve_project_id(project_id)
+    if resolved_pid:
+        env["ANTIGRAVITY_PROJECT_ID"] = str(resolved_pid)
     elif b.get("ANTIGRAVITY_PROJECT_ID"):
         env["ANTIGRAVITY_PROJECT_ID"] = str(b["ANTIGRAVITY_PROJECT_ID"])
 
