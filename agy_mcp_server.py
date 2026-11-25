@@ -45,6 +45,42 @@ UUID_SEARCH_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0
 TITLE_PBTXT_RE = re.compile(r'title:\s*"((?:[^"\\]|\\.)*)"')
 
 
+def get_caller_claude_session() -> dict[str, Any] | None:
+    """Identify the calling Claude Code session by matching os.getppid() against ~/.claude/sessions/<pid>.json."""
+    sessions_dir = HOME / ".claude" / "sessions"
+    if not sessions_dir.exists():
+        return None
+    ppid = os.getppid()
+    direct_file = sessions_dir / f"{ppid}.json"
+    if direct_file.exists():
+        try:
+            data = json.loads(direct_file.read_text(encoding="utf-8", errors="replace"))
+            return {
+                "pid": data.get("pid", ppid),
+                "session_id": data.get("sessionId", ""),
+                "name": data.get("name", ""),
+                "cwd": data.get("cwd", ""),
+                "entrypoint": data.get("entrypoint", ""),
+            }
+        except Exception:
+            pass
+    return None
+
+
+def format_claude_sender_footer() -> str:
+    info = get_caller_claude_session()
+    if not info:
+        return ""
+    sid = info.get("session_id") or "unknown"
+    name = info.get("name") or sid
+    pid = info.get("pid") or ""
+    return (
+        f"\n\n[Sender routing: Sent from Claude Code session \"{name}\" "
+        f"(session_id: {sid}, pid: {pid}). "
+        f"To message this Claude session directly from Antigravity, call claude_send_message(to=\"{name}\", message=\"...\").]"
+    )
+
+
 def load_bridge_env() -> dict[str, Any]:
     data: dict[str, Any] = {}
     if BRIDGE_ENV_FILE.exists():
@@ -367,6 +403,7 @@ def tool_agy_app_status(_args: dict[str, Any]) -> dict[str, Any]:
         "bridge_env_updated_at": b.get("updated_at"),
         "agy_cli_installed": cli_exists,
         "agy_cli_path": agy_cli,
+        "caller_claude_session": get_caller_claude_session(),
     }
 
 
@@ -386,10 +423,11 @@ def tool_agy_app_new_conversation(args: dict[str, Any]) -> dict[str, Any]:
     before_ids = {d.name for d in brain_dir.iterdir() if d.is_dir()} if brain_dir.exists() else set()
     start_ts = time.time()
 
+    full_prompt = prompt + format_claude_sender_footer()
     cmd_args = ["new-conversation", f"--model={model}"]
     if title:
         cmd_args.append(f"--title={title}")
-    cmd_args.append(prompt)
+    cmd_args.append(full_prompt)
 
     api_res = run_agentapi(cmd_args, project_id=project_id, timeout=30)
     conv_id = extract_conversation_id(api_res)
@@ -401,6 +439,7 @@ def tool_agy_app_new_conversation(args: dict[str, Any]) -> dict[str, Any]:
         "conversation_id": conv_id,
         "model": model,
         "title": title,
+        "caller_claude_session": get_caller_claude_session(),
         "agentapi_response": api_res,
     }
 
@@ -436,10 +475,11 @@ def tool_agy_app_send_message(args: dict[str, Any]) -> dict[str, Any]:
     steps_before, _, _ = read_transcript_lines(app_data, conv_id)
     baseline_count = len(steps_before)
 
+    full_message = message + format_claude_sender_footer()
     cmd_args = ["send-message"]
     if title:
         cmd_args.extend(["--title", title])
-    cmd_args.extend([conv_id, message])
+    cmd_args.extend([conv_id, full_message])
 
     api_res = run_agentapi(cmd_args, project_id=project_id, timeout=30)
     result: dict[str, Any] = {
@@ -447,6 +487,7 @@ def tool_agy_app_send_message(args: dict[str, Any]) -> dict[str, Any]:
         "conversation_id": conv_id,
         "conversation_title": get_conversation_title(app_data, conv_id),
         "baseline_steps": baseline_count,
+        "caller_claude_session": get_caller_claude_session(),
         "agentapi_response": api_res,
     }
 
