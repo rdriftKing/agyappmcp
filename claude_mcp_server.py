@@ -131,6 +131,95 @@ def _tools(raw: Any) -> list[str]:
     return items
 
 
+def _mcp_serve_call(tool_name: str, arguments: dict[str, Any], timeout: float = 15.0) -> dict[str, Any]:
+    """Invoke a native peer tool (ListAgents or SendMessage) via `claude mcp serve` over stdio."""
+    exe = find_claude_exe()
+    p = subprocess.Popen(
+        _exe_argv(exe) + ["mcp", "serve"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    try:
+        assert p.stdin is not None and p.stdout is not None
+        init_req = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": {"name": "antigravity-claude-bridge", "version": SERVER_VERSION},
+            },
+        }
+        p.stdin.write(json.dumps(init_req) + "\n")
+        p.stdin.flush()
+        p.stdout.readline()
+
+        p.stdin.write(json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}) + "\n")
+        call_req = {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {"name": tool_name, "arguments": arguments},
+        }
+        p.stdin.write(json.dumps(call_req, ensure_ascii=False) + "\n")
+        p.stdin.flush()
+
+        raw_line = p.stdout.readline().strip()
+        if not raw_line:
+            stderr_out = (p.stderr.read() if p.stderr else "").strip()
+            raise ToolError(f"Empty response from `claude mcp serve` ({tool_name}): {stderr_out}")
+        resp = json.loads(raw_line)
+        if "error" in resp:
+            raise ToolError(f"`claude mcp serve` error: {resp['error']}")
+        result = resp.get("result") or {}
+        content = result.get("content") or []
+        text = content[0].get("text", "") if content and isinstance(content[0], dict) else ""
+        if result.get("isError"):
+            raise ToolError(f"{tool_name} failed: {text}")
+        try:
+            return json.loads(text)
+        except ValueError:
+            return {"raw": text}
+    finally:
+        try:
+            p.terminate()
+            p.wait(timeout=3)
+        except Exception:
+            pass
+
+
+def tool_claude_list_sessions(_args: dict[str, Any]) -> dict[str, Any]:
+    return _mcp_serve_call("ListAgents", {})
+
+
+def tool_claude_send_message(args: dict[str, Any]) -> dict[str, Any]:
+    to = args.get("to")
+    message = args.get("message")
+    summary = args.get("summary", "Message from Antigravity 2.0 App")
+    if not isinstance(to, str) or not to.strip():
+        raise ToolError("'to' (target Claude Desktop session name, e.g. from claude_list_sessions) is required.")
+    if not isinstance(message, str) or not message.strip():
+        raise ToolError("'message' is required.")
+
+    blocked = _gate(message)
+    if blocked:
+        raise ToolError("Message withheld by the outbound gate: " + "; ".join(blocked))
+
+    payload: dict[str, Any] = {
+        "to": to.strip(),
+        "message": message,
+    }
+    if isinstance(summary, str) and summary.strip():
+        payload["summary"] = summary.strip()[:200]
+
+    return _mcp_serve_call("SendMessage", payload)
+
+
 def tool_claude_status(_args: dict[str, Any]) -> dict[str, Any]:
     exe = find_claude_exe()
     exists = os.path.exists(exe) or bool(shutil.which(exe))
@@ -237,9 +326,42 @@ TOOLS = [
             "additionalProperties": False,
         },
     },
+    {
+        "name": "claude_list_sessions",
+        "description": "List all currently open/active Claude Desktop App sessions on this machine (via Claude Code native Peer ListAgents) that you can send messages to with claude_send_message.",
+        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "claude_send_message",
+        "description": "Send a live cross-session message directly into an already-open Claude Desktop App session on this machine (via Claude Code native Peer SendMessage). Passes the outbound confidentiality gate before sending.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "to": {
+                    "type": "string",
+                    "description": "Target Claude Desktop session name (or 'name [ref]') as returned by claude_list_sessions (e.g. 'AGY 通訊測試 (fork)').",
+                },
+                "message": {
+                    "type": "string",
+                    "description": "The plain text message to deliver to that open Claude Desktop session.",
+                },
+                "summary": {
+                    "type": "string",
+                    "description": "Optional short 5-10 word summary label.",
+                },
+            },
+            "required": ["to", "message"],
+            "additionalProperties": False,
+        },
+    },
 ]
 
-TOOL_HANDLERS = {"claude_status": tool_claude_status, "claude_ask": tool_claude_ask}
+TOOL_HANDLERS = {
+    "claude_status": tool_claude_status,
+    "claude_ask": tool_claude_ask,
+    "claude_list_sessions": tool_claude_list_sessions,
+    "claude_send_message": tool_claude_send_message,
+}
 
 
 def handle_request(msg: dict[str, Any]) -> dict[str, Any] | None:
