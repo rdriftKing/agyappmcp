@@ -20,6 +20,7 @@ GEMINI_DIR = HOME / ".gemini"
 CONFIG_DIR = GEMINI_DIR / "config"
 SIDECAR_DIR = CONFIG_DIR / "sidecars" / "claude_mcp_bridge"
 GLOBAL_SKILL_DIR = CONFIG_DIR / "skills" / "agy-claude-mcp"
+CLAUDE_GLOBAL_SKILL_DIR = HOME / ".claude" / "skills" / "agy-claude-mcp"
 HOOKS_FILE = CONFIG_DIR / "hooks.json"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 MCP_CONFIG_FILE = CONFIG_DIR / "mcp_config.json"
@@ -106,12 +107,16 @@ def main():
     MCP_CONFIG_FILE.write_text(json.dumps(mcp_cfg, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"[OK] Registered 'claude-code' MCP in {MCP_CONFIG_FILE}")
 
-    # 5. Install Global Skill into ~/.gemini/config/skills/agy-claude-mcp
+    # 5. Install Global Skill into ~/.gemini/config/skills/agy-claude-mcp and ~/.claude/skills/agy-claude-mcp
     repo_skill_md = REPO_DIR / "skills" / "agy-claude-mcp" / "SKILL.md"
     if repo_skill_md.exists():
         GLOBAL_SKILL_DIR.mkdir(parents=True, exist_ok=True)
         shutil.copy2(repo_skill_md, GLOBAL_SKILL_DIR / "SKILL.md")
-        print(f"[OK] Installed Global Skill to {GLOBAL_SKILL_DIR / 'SKILL.md'}")
+        print(f"[OK] Installed Antigravity Global Skill to {GLOBAL_SKILL_DIR / 'SKILL.md'}")
+
+        CLAUDE_GLOBAL_SKILL_DIR.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(repo_skill_md, CLAUDE_GLOBAL_SKILL_DIR / "SKILL.md")
+        print(f"[OK] Installed Claude Code Global Skill to {CLAUDE_GLOBAL_SKILL_DIR / 'SKILL.md'}")
 
     # 6. Hot-refresh MCP server if running inside Antigravity 2.0
     ls_addr = os.environ.get("ANTIGRAVITY_LS_ADDRESS")

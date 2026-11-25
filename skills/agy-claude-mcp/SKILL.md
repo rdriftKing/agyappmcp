@@ -29,20 +29,22 @@ python "D:\5791\agyappmcp\install_mcp.py"
 
 ### 1. Claude Code 呼叫 Antigravity 2.0 App (`antigravity` MCP)
 
-- `agy_app_status`：檢查與執行中 Antigravity 2.0 App (`agentapi`) 及 `agy.exe` 的連線狀態與最新對話 ID。
-- `agy_app_new_conversation`：直接在 **Antigravity 2.0 桌面 App** 開啟新對話並執行任務（參數：`prompt`, `title`, `model`, `project_id`, `wait_for_response`, `timeout_seconds`）。
-- `agy_app_send_message`：直接向 **Antigravity 2.0 桌面 App** 中的既有對話傳送訊息並等待回覆（參數：`message`, `conversation_id` 未填預設最新活躍對話, `wait_for_response`）。
-- `agy_app_list_conversations`：列出 Antigravity 2.0 App 最近對話清單。
-- `agy_app_get_conversation`：讀取指定對話的完整紀錄 (`USER_INPUT`、`PLANNER_RESPONSE`) 與 Artifact `.md` 檔案清單。
-- `agy_app_list_projects`：列出 Antigravity 2.0 App 已設定的所有專案 ID 與工作區路徑。
-- `agy_cli_ask`：透過 `agy.exe --print` 在背景執行單次詢問（參數：`prompt`, `model`, `effort`, `mode`, `cwd`, `conversation_id`, `continue_last`）。
-- `agy_cli_list_models`：執行 `agy.exe models` 列出所有可用模型 ID。
+> **給 Claude Code 的重要提示**：此 MCP Server 註冊名稱為 `antigravity`，在 Claude Code 內部的完整工具名稱為 `mcp__antigravity__<工具名>`。若工具為延遲載入（Deferred Tools），請先呼叫 `ToolSearch` 搜尋 `"antigravity"` 或 `"agy_app"` 載入工具 schema，再直接呼叫以下工具（**不要**用 Bash 猜測路徑）：
+
+- `mcp__antigravity__agy_app_status`（`agy_app_status`）：檢查與執行中 Antigravity 2.0 App (`agentapi`) 及 `agy.exe` 的連線狀態與最新對話 ID。
+- `mcp__antigravity__agy_app_new_conversation`（`agy_app_new_conversation`）：直接在 **Antigravity 2.0 桌面 App** 開啟新對話並執行任務（參數：`prompt`, `title`, `model`, `project_id`, `wait_for_response`, `timeout_seconds`）。
+- `mcp__antigravity__agy_app_send_message`（`agy_app_send_message`）：直接向 **Antigravity 2.0 桌面 App** 中的既有對話傳送訊息並等待回覆（參數：`message`, `conversation_id` 未填預設最新活躍對話, `wait_for_response`）。
+- `mcp__antigravity__agy_app_list_conversations`（`agy_app_list_conversations`）：列出 Antigravity 2.0 App 最近對話清單。
+- `mcp__antigravity__agy_app_get_conversation`（`agy_app_get_conversation`）：讀取指定對話的完整紀錄 (`USER_INPUT`、`PLANNER_RESPONSE`) 與 Artifact `.md` 檔案清單。
+- `mcp__antigravity__agy_app_list_projects`（`agy_app_list_projects`）：列出 Antigravity 2.0 App 已設定的所有專案 ID 與工作區路徑。
+- `mcp__antigravity__agy_cli_ask`（`agy_cli_ask`）：透過 `agy.exe --print` 在背景執行單次詢問（參數：`prompt`, `model`, `effort`, `mode`, `cwd`, `conversation_id`, `continue_last`）。
+- `mcp__antigravity__agy_cli_list_models`（`agy_cli_list_models`）：執行 `agy.exe models` 列出所有可用模型 ID。
 
 ### 2. Antigravity 2.0 App 呼叫 Claude Code (`claude-code` MCP)
 
 在 Antigravity 2.0 App 中透過 `call_mcp_tool`（`ServerName: "claude-code"`）呼叫：
 - `claude_status`：檢查本機 `claude.exe` 安裝路徑與版本。
-- `claude_ask`：透過 `claude.exe -p` 向 Claude Code 發送詢問或請求第二意見（參數：`prompt`, `cwd`, `model`, `continue_last`, `resume_session_id`, `allowed_tools`）。
+- `claude_ask`：透過 `claude -p` 以**唯讀模式**詢問 Claude Code（只能 Read／Glob／Grep，不能執行指令或改檔；工作資料夾限 Amateur 工作區；回覆先過機密閘門才回傳）。參數：`prompt`, `cwd`（限工作區內）, `model`, `allowed_tools`（只能是 Read／Glob／Grep 的子集）, `resume_session_id`（只能接續 claude_ask 自己建立的 session）, `append_system_prompt`, `timeout_seconds`（上限 600）。⛔ 已移除 `dangerously_skip_permissions`、`continue_last`（2026-11-25）。
 
 ### 3. 若在 `D:\5791\Amateur_for_Ray` 工作區作業
 - 正式任務交付、草稿提交與審查紀錄請遵守該工作區 `AGENTS.md` 規範，搭配 `amateur-bridge`（`bridge_inbox`、`bridge_send`、`bridge_thread`、`bridge_check_base`）使用。
