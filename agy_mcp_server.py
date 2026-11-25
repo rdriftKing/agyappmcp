@@ -915,7 +915,25 @@ TOOL_HANDLERS = {
 # JSON-RPC 2.0 Stdio MCP Transport
 # ============================================================================
 
+_LAST_MTIME = os.path.getmtime(__file__)
+
+
+def _maybe_hot_reload() -> None:
+    """Automatically reload tool handlers in-place if agy_mcp_server.py was updated on disk."""
+    global _LAST_MTIME
+    try:
+        cur_mtime = os.path.getmtime(__file__)
+        if cur_mtime > _LAST_MTIME:
+            _LAST_MTIME = cur_mtime
+            code = Path(__file__).read_text(encoding="utf-8")
+            exec(compile(code, __file__, "exec"), globals())
+            _LAST_MTIME = cur_mtime
+    except Exception:
+        pass
+
+
 def handle_request(msg: dict[str, Any]) -> dict[str, Any] | None:
+    _maybe_hot_reload()
     method = msg.get("method", "")
     req_id = msg.get("id")
     params = msg.get("params") or {}
