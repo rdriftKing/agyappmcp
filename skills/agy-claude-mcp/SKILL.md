@@ -44,6 +44,8 @@ python "D:\5791\agyappmcp\install_mcp.py"
 
 在 Antigravity 2.0 App 中透過 `call_mcp_tool`（`ServerName: "claude-code"`）呼叫：
 - `claude_status`：檢查本機 `claude.exe` 安裝路徑與版本。
+- `claude_list_sessions`：列出這台電腦上所有**正在開啟中的 Claude Desktop App 對話視窗**（回傳每個對話的 `name` 與 `[ref]`）。
+- `claude_send_message`：**直接傳送即時訊息到任何一個已經開啟的 Claude Desktop App 對話視窗並自動喚醒它**（參數：`to` 填入 `claude_list_sessions` 查到的對話名稱如 `"AGY 通訊測試 (fork)"`, `message` 填入訊息內容）。工具會先通過資安出站閘門檢查，並自動附上當前 Antigravity `conversation_id` 的回信路由提示，讓 Claude 處理完後可直接用 `agy_app_send_message(wait_for_response=false)` 回傳到同一個 Antigravity 對話視窗！
 - `claude_ask`：透過 `claude -p` 以**唯讀模式**詢問 Claude Code（只能 Read／Glob／Grep，不能執行指令或改檔；工作資料夾限 Amateur 工作區；回覆先過機密閘門才回傳）。參數：`prompt`, `cwd`（限工作區內）, `model`, `allowed_tools`（只能是 Read／Glob／Grep 的子集）, `resume_session_id`（只能接續 claude_ask 自己建立的 session）, `append_system_prompt`, `timeout_seconds`（上限 600）。⛔ 已移除 `dangerously_skip_permissions`、`continue_last`（2026-11-25）。
 
 ### 3. 若在 `D:\5791\Amateur_for_Ray` 工作區作業

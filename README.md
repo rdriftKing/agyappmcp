@@ -55,7 +55,9 @@ python install_mcp.py
 | 工具名稱 | 功能說明 |
 | :--- | :--- |
 | `claude_status` | 檢查本機 `claude.exe` 安裝路徑與版本。 |
-| `claude_ask` | 透過 `claude.exe -p` 向 Claude Code 發送詢問或請求 Code Review / 第二意見，並取回 Claude Code 的回覆。 |
+| `claude_list_sessions` | 列出本機目前所有**正在開啟中的 Claude Desktop App 對話分頁**（名稱、`[ref]` 與 `idle`/`busy` 狀態）。 |
+| `claude_send_message` | 經過出站資安閘門檢查後，**直接將訊息傳送到已開啟的 Claude Desktop App 對話視窗並自動喚醒它**（自動附帶 Antigravity `conversation_id` 回信指引，讓 Claude 可直接透過 `agy_app_send_message` 回傳至原視窗）。 |
+| `claude_ask` | 透過 `claude.exe -p` 在背景唯讀模式向 Claude Code 發送詢問或請求第二意見，並取回 Claude Code 的回覆。 |
 
 ---
 

@@ -197,6 +197,20 @@ def tool_claude_list_sessions(_args: dict[str, Any]) -> dict[str, Any]:
     return _mcp_serve_call("ListAgents", {})
 
 
+def _current_agy_conversation_id() -> str:
+    env_cid = os.environ.get("ANTIGRAVITY_CONVERSATION_ID", "").strip()
+    if env_cid:
+        return env_cid
+    bridge_env = Path(__file__).resolve().with_name("bridge_env.json")
+    if bridge_env.exists():
+        try:
+            data = json.loads(bridge_env.read_text(encoding="utf-8"))
+            return str(data.get("ANTIGRAVITY_CONVERSATION_ID") or "").strip()
+        except Exception:
+            pass
+    return ""
+
+
 def tool_claude_send_message(args: dict[str, Any]) -> dict[str, Any]:
     to = args.get("to")
     message = args.get("message")
@@ -210,9 +224,19 @@ def tool_claude_send_message(args: dict[str, Any]) -> dict[str, Any]:
     if blocked:
         raise ToolError("Message withheld by the outbound gate: " + "; ".join(blocked))
 
+    agy_cid = _current_agy_conversation_id()
+    routing_note = (
+        f"\n\n[Reply routing: Sent from Antigravity 2.0 App"
+        + (f" (conversation_id: {agy_cid})" if agy_cid else "")
+        + ". Do NOT reply with Claude SendMessage (sender is a one-shot MCP bridge with no inbox, which returns ENOINBOX: dead-owner); "
+        + "to reply to Antigravity, call mcp__antigravity__agy_app_send_message"
+        + (f' with conversation_id="{agy_cid}" and wait_for_response=false.' if agy_cid else " with wait_for_response=false.")
+        + "]"
+    )
+
     payload: dict[str, Any] = {
         "to": to.strip(),
-        "message": message,
+        "message": message + routing_note,
     }
     if isinstance(summary, str) and summary.strip():
         payload["summary"] = summary.strip()[:200]
