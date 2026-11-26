@@ -194,7 +194,35 @@ def _mcp_serve_call(tool_name: str, arguments: dict[str, Any], timeout: float = 
 
 
 def tool_claude_list_sessions(_args: dict[str, Any]) -> dict[str, Any]:
-    return _mcp_serve_call("ListAgents", {})
+    res = _mcp_serve_call("ListAgents", {})
+    # Enrich with session_id, pid, and cwd from ~/.claude/sessions/*.json
+    sessions_dir = Path.home() / ".claude" / "sessions"
+    by_name: dict[str, list[dict[str, Any]]] = {}
+    if sessions_dir.exists():
+        for sf in sorted(sessions_dir.glob("*.json")):
+            try:
+                sdata = json.loads(sf.read_text(encoding="utf-8", errors="replace"))
+                sname = str(sdata.get("name") or "").strip()
+                info = {
+                    "pid": sdata.get("pid"),
+                    "session_id": sdata.get("sessionId"),
+                    "name": sname,
+                    "cwd": sdata.get("cwd"),
+                    "status": sdata.get("status"),
+                }
+                by_name.setdefault(sname, []).append(info)
+            except Exception:
+                pass
+    for sec in res.get("sections") or []:
+        for row in sec.get("rows") or []:
+            rname = str(row.get("name") or "").strip()
+            matches = by_name.get(rname)
+            if matches:
+                m = matches[0]
+                row["session_id"] = m.get("session_id")
+                row["pid"] = m.get("pid")
+                row["cwd"] = m.get("cwd")
+    return res
 
 
 def _current_agy_conversation_id() -> str:
